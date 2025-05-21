@@ -1,0 +1,55 @@
+import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom"; // 👈 import useParams
+import DepartmentSection from "./DepartmentSection";
+import UniversityPostFeed from "./PostFeed";
+
+const UniversityGroup = () => {
+  const { universityName } = useParams(); // 👈 extract from URL
+  const [universityData, setUniversityData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUniversityInfo = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/universities/${universityName}`
+        );
+        const data = await res.json();
+        console.log(data)
+        console.log("data:",data.post_ids)
+        setUniversityData(data);
+      } catch (err) {
+        console.error("Error fetching university data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUniversityInfo();
+  }, [universityName]);
+
+  if (loading) return <div className="text-center p-8">Loading...</div>;
+  if (!universityData) return <div className="text-center p-8">No data found.</div>;
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 p-4 max-w-screen-xl mt-20 md:mt-24 min-h-screen">
+      {/* Left Sidebar - Departments */}
+      <div className="md:col-span-1">
+        <h2 className="text-xl font-semibold mb-2">Departments</h2>
+        {Object.entries(universityData.departments).map(([dept, members]) => (
+          <DepartmentSection key={dept} deptName={dept} members={members} />
+        ))}
+      </div>
+
+      {/* Middle Section - Posts */}
+      <div className="md:col-span-3">
+        <h2 className="text-xl font-semibold mb-4">
+          #{universityName.toUpperCase()} Posts
+        </h2>
+        <UniversityPostFeed postIds={universityData.post_ids} />
+      </div>
+    </div>
+  );
+};
+
+export default UniversityGroup;

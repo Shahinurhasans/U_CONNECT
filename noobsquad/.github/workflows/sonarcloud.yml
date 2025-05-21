@@ -1,0 +1,78 @@
+name: SonarCloud CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sonarcloud:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: ${{ secrets.POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB: ${{ secrets.POSTGRES_DB }}
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Fetch all history
+
+      # Optional: Set up Python if needed for SonarPython analysis
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12.4
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-cov python-dotenv
+
+      - name: Create .env file
+        run: |
+          echo "DATABASE_URL=postgresql://${{ secrets.POSTGRES_USER }}:${{ secrets.POSTGRES_PASSWORD }}@localhost:5432/${{ secrets.POSTGRES_DB }}" > backend/.env
+          echo "HUGGINGFACE_API_KEY=${{ secrets.HUGGINGFACE_API_KEY }}" >> backend/.env
+          echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> backend/.env
+          echo "ALGORITHM=${{ secrets.ALGORITHM }}" >> backend/.env
+          echo "GOOGLE_API_KEY=${{ secrets.GOOGLE_API_KEY }}" >> backend/.env
+          echo "BREVO_API_KEY=${{ secrets.BREVO_API_KEY }}" >> backend/.env
+          echo "EMAIL_FROM=${{ secrets.EMAIL_FROM }}" >> backend/.env
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" >> backend/.env
+          echo "CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}" >> backend/.env
+          echo "CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}" >> backend/.env
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> backend/.env
+          echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> backend/.env
+        shell: bash
+
+      - name: Run tests with coverage
+        run: |
+        
+          pytest backend/tests --cov=backend --cov-report=xml:backend/coverage.xml --cov-config=backend/.coveragerc --cov-report=term-missing
+
+      - name: Debug coverage report
+        run: |
+            cat backend/coverage.xml | grep -A 5 "<source>"
+            cat backend/coverage.xml | grep "<class "
+        
+
+      # Run SonarCloud scan with coverage report
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@v2
+        with:
+          projectBaseDir: .
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
