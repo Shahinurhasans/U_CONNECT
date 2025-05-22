@@ -9,7 +9,7 @@ cloudinary_key = os.getenv("CLOUDINARY_API_KEY")
 cloudinary_secret = os.getenv("CLOUDINARY_API_SECRET")
 
 cloudinary.config(
-  cloud_name="dws8lpmua",
+  cloud_name="dzbxi7mda",
   api_key=cloudinary_key,
   api_secret=cloudinary_secret,
   secure=True
