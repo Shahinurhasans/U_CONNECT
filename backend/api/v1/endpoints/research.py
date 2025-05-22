@@ -21,6 +21,68 @@ load_dotenv()
 
 router = APIRouter()
 
+
+
+# Add this to api/v1/endpoints/research.py
+
+@router.post("/accept-collaboration/{request_id}/")
+def accept_collaboration_request(
+    request_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Accept a collaboration request.
+    
+    Args:
+        request_id: ID of the collaboration request to accept
+        db: Database session
+        current_user: Current authenticated user
+        
+    Returns:
+        Success message
+    """
+    try:
+        # Get the collaboration request
+        collab_request = db.query(CollaborationRequest).filter(
+            CollaborationRequest.id == request_id
+        ).first()
+        
+        if not collab_request:
+            raise HTTPException(status_code=404, detail="Collaboration request not found")
+            
+        # Get the research to verify ownership
+        research = db.query(ResearchCollaboration).filter(
+            ResearchCollaboration.id == collab_request.research_id
+        ).first()
+        
+        if not research:
+            raise HTTPException(status_code=404, detail="Research not found")
+            
+        # Verify that the current user is the owner of the research
+        if research.creator_id != current_user.id:
+            raise HTTPException(
+                status_code=403, 
+                detail="You don't have permission to accept this collaboration request"
+            )
+            
+        # Update the request status to accepted
+        collab_request.status = "accepted"
+        db.commit()
+        
+        return {"message": "Collaboration request accepted successfully"}
+        
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to accept collaboration request: {str(e)}")
+
+
+
+
+
+
+
+
 @router.post("/upload-paper/")
 async def upload_paper(
     title: str = Form(...),
@@ -96,6 +158,10 @@ async def post_research(title: str = Form(...), research_field: str = Form(...),
     save_new_research(db, research)
     return {"message": "Research work posted successfully", "research_id": research.id}
 
+
+
+
+
 @router.post("/request-collaboration/{research_id}/")
 def request_collaboration(research_id: int, message: str = Form(...), db: Session = Depends(get_db), current_user: ResearchPaper = Depends(get_current_user)):
     if not current_user:
@@ -107,10 +173,24 @@ def request_collaboration(research_id: int, message: str = Form(...), db: Sessio
     collab_request = CollaborationRequest(research_id=research_id, requester_id=current_user.id, message=message)
     save_collaboration_request(db, collab_request)
     return {"message": "Collaboration request sent successfully"}
-
 @router.get("/collaboration-requests/")
 def get_collaboration_requests(db: Session = Depends(get_db), current_user: ResearchPaper = Depends(get_current_user)):
-    return get_pending_collaboration_requests(db, current_user.id)
+    results = get_pending_collaboration_requests(db, current_user.id)
+    # Convert SQLAlchemy Row objects to dictionaries
+    return [
+        {
+            "id": row.id,
+            "research_title": row.research_title,
+            "message": row.message,
+            "status": row.status,
+            "requester_username": row.requester_username,
+            # Add any other fields needed by the frontend
+            "sender_avatar": None,  # You might want to add this field to your query
+            "timestamp": None  # You might want to add this field to your query
+        }
+        for row in results
+    ]
+
 
 @router.get("/papers/user/{user_id}")
 def get_papers_by_user(user_id: int, db: Session = Depends(get_db)):
