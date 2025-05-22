@@ -98,3 +98,4 @@ backend/uploads/chat/*
 alembic/versions/
 
 backend/.flake8
+final_presentation.mp4
